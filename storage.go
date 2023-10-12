@@ -2,13 +2,18 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/lib/pq"
 )
 
 type Storage interface {
+	CreateAccount(*Account) error
+	DeleteAccount(int) error
+	UpdateAccount(*Account) error
 	GetAccounts() ([]*Account, error)
-	CreateAccount(acc *Account) error
+	GetAccountByID(int) (*Account, error)
+	GetAccountByNumber(int) (*Account, error)
 }
 
 type PostgresStore struct {
@@ -41,6 +46,7 @@ func (s *PostgresStore) createAccountTable() error {
 		first_name varchar(100),
 		last_name varchar(100),
 		number serial,
+		encrypted_password varchar(100),
 		balance serial,
 		created_at timestamp
 	)`
@@ -58,6 +64,8 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 		query,
 		acc.FirstName,
 		acc.LastName,
+		acc.Number,
+		acc.EncryptedPassword,
 		acc.Balance,
 		acc.CreatedAt)
 
@@ -66,6 +74,41 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 	}
 
 	return nil
+}
+
+func (s *PostgresStore) UpdateAccount(*Account) error {
+	return nil
+}
+
+func (s *PostgresStore) DeleteAccount(id int) error {
+	_, err := s.db.Query("delete from account where id = $1", id)
+	return err
+}
+
+func (s *PostgresStore) GetAccountByNumber(number int) (*Account, error) {
+	rows, err := s.db.Query("select * from account where number = $1", number)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("account with number [%d] not found", number)
+}
+
+func (s *PostgresStore) GetAccountByID(id int) (*Account, error) {
+	rows, err := s.db.Query("select * from account where id = $1", id)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("account %d not found", id)
 }
 
 func (s *PostgresStore) GetAccounts() ([]*Account, error) {
@@ -93,6 +136,7 @@ func scanIntoAccount(rows *sql.Rows) (*Account, error) {
 		&account.FirstName,
 		&account.LastName,
 		&account.Number,
+		&account.EncryptedPassword,
 		&account.Balance,
 		&account.CreatedAt)
 
