@@ -30,7 +30,6 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/login", makeHTTPHandleFunc(s.handleLogin))
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
-	router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
 
@@ -144,16 +143,6 @@ func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) 
 	return WriteJSON(w, http.StatusOK, map[string]int{"deleted": id})
 }
 
-func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
-	transferReq := new(TransferRequest)
-	if err := json.NewDecoder(r.Body).Decode(transferReq); err != nil {
-		return err
-	}
-	defer r.Body.Close()
-
-	return WriteJSON(w, http.StatusOK, transferReq)
-}
-
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -221,12 +210,10 @@ func validateJWT(tokenString string) (*jwt.Token, error) {
 	secret := os.Getenv("JWT_SECRET")
 
 	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
 
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return []byte(secret), nil
 	})
 }
